@@ -1,0 +1,5 @@
+python-oslo.middleware (0.1.0-1) unstable; urgency=medium
+
+  * Initial release. (Closes: #769283)
+
+ -- Thomas Goirand <zigo@debian.org>  Wed, 12 Nov 2014 19:50:52 +0800

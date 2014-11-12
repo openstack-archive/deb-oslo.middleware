@@ -1,0 +1,9 @@
+Document: python-oslo.middleware-doc
+Title: oslo.middleware Documentation
+Author: N/A
+Abstract: Sphinx documentation for oslo.middleware
+Section: Programming/Python
+
+Format: HTML
+Index: /usr/share/doc/python-oslo.middleware-doc/html/index.html
+Files: /usr/share/doc/python-oslo.middleware-doc/html/*
