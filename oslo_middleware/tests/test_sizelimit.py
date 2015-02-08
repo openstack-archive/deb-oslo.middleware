@@ -12,12 +12,12 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+from oslo_config import fixture as config
 from oslotest import base as test_base
 import six
 import webob
 
-from oslo.config import fixture as config
-from oslo.middleware import sizelimit
+from oslo_middleware import sizelimit
 
 
 class TestLimitingReader(test_base.BaseTestCase):

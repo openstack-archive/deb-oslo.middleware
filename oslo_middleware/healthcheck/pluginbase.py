@@ -1,3 +1,6 @@
+# Copyright 2011 OpenStack Foundation.
+# All Rights Reserved.
+#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -10,19 +13,23 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import warnings
+import abc
+import collections
 
-from oslo_middleware import *
+import six
 
-
-def deprecated():
-    new_name = __name__.replace('.', '_')
-    warnings.warn(
-        ('The oslo namespace package is deprecated. Please use %s instead.' %
-         new_name),
-        DeprecationWarning,
-        stacklevel=3,
-    )
+HealthcheckResult = collections.namedtuple(
+    'HealthcheckResult', ['available', 'reason'], verbose=True)
 
 
-deprecated()
+@six.add_metaclass(abc.ABCMeta)
+class HealthcheckBaseExtension(object):
+    def __init__(self, conf):
+        self.conf = conf
+
+    @abc.abstractmethod
+    def healthcheck():
+        """method called by the healthcheck middleware
+
+        return: HealthcheckResult object
+        """

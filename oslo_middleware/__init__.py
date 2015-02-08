@@ -1,4 +1,3 @@
-#
 #    Licensed under the Apache License, Version 2.0 (the "License"); you may
 #    not use this file except in compliance with the License. You may obtain
 #    a copy of the License at
@@ -11,7 +10,16 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import six
+__all__ = ['CatchErrors',
+           'CorrelationId',
+           'Debug',
+           'Healthcheck',
+           'RequestId',
+           'RequestBodySizeLimiter']
 
-
-six.add_move(six.MovedModule('mox', 'mox', 'mox3.mox'))
+from oslo_middleware.catch_errors import CatchErrors
+from oslo_middleware.correlation_id import CorrelationId
+from oslo_middleware.debug import Debug
+from oslo_middleware.healthcheck import Healthcheck
+from oslo_middleware.request_id import RequestId
+from oslo_middleware.sizelimit import RequestBodySizeLimiter
