@@ -1,1 +1,2 @@
 adds-missing-files.patch
+do-not-run-test-on-toplevel-folder.patch
