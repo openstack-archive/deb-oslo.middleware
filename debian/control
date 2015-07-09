@@ -108,7 +108,7 @@ Architecture: all
 Depends: python-oslo.middleware,
          ${misc:Depends},
 Description: transitional dummy package for python-oslo-middleware.
- This transtional package is safe to remove.
+ This transitional package is safe to remove.
 
 Package: python-oslo-middleware-doc
 Section: oldlibs
@@ -116,7 +116,7 @@ Architecture: all
 Depends: python-oslo.middleware-doc,
          ${misc:Depends},
 Description: transitional dummy package for python-oslo-middleware-doc.
- This transtional package is safe to remove.
+ This transitional package is safe to remove.
 
 Package: python3-oslo-middleware
 Section: oldlibs
@@ -124,4 +124,4 @@ Architecture: all
 Depends: python3-oslo.middleware,
          ${misc:Depends},
 Description: transitional dummy package for python3-oslo-middleware.
- This transtional package is safe to remove.
+ This transitional package is safe to remove.
