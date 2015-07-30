@@ -15,6 +15,7 @@
 # Default allowed headers
 import copy
 import logging
+
 from oslo_config import cfg
 from oslo_middleware import base
 import webob.dec
@@ -53,6 +54,38 @@ CORS_OPTS = [
 ]
 
 
+def filter_factory(global_conf,
+                   allowed_origin,
+                   allow_credentials=True,
+                   expose_headers=None,
+                   max_age=None,
+                   allow_methods=None,
+                   allow_headers=None):
+    '''Factory to support paste.deploy
+
+    :param global_conf: The paste.ini global configuration object (not used).
+    :param allowed_origin: Protocol, host, and port for the allowed origin.
+    :param allow_credentials: Whether to permit credentials.
+    :param expose_headers: A list of headers to expose.
+    :param max_age: Maximum cache duration.
+    :param allow_methods: List of HTTP methods to permit.
+    :param allow_headers: List of HTTP headers to permit from the client.
+    :return:
+    '''
+
+    def filter(app):
+        cors_app = CORS(app)
+        cors_app.add_origin(allowed_origin=allowed_origin,
+                            allow_credentials=allow_credentials,
+                            expose_headers=expose_headers,
+                            max_age=max_age,
+                            allow_methods=allow_methods,
+                            allow_headers=allow_headers)
+        return cors_app
+
+    return filter
+
+
 class CORS(base.Middleware):
     """CORS Middleware.
 
@@ -71,13 +104,21 @@ class CORS(base.Middleware):
         'Pragma'
     ]
 
-    def __init__(self, application, conf):
+    def __init__(self, application, conf=None):
         super(CORS, self).__init__(application)
 
+        # Begin constructing our configuration hash.
+        self.allowed_origins = {}
+
+        # Sanity check. Do we have an oslo.config? If so, load it. Else, assume
+        # that we'll use add_config.
+        if conf:
+            self._init_from_oslo(conf)
+
+    def _init_from_oslo(self, conf):
+        '''Initialize this middleware from an oslo.config instance.'''
+
         # First, check the configuration and register global options.
-        if not conf or not isinstance(conf, cfg.ConfigOpts):
-            raise ValueError("This middleware requires a configuration of"
-                             " type oslo_config.ConfigOpts.")
         conf.register_opts(CORS_OPTS, 'cors')
 
         # Clone our original CORS_OPTS, and set the defaults to whatever is
@@ -92,13 +133,10 @@ class CORS(base.Middleware):
                          allow_methods=conf.cors.allow_methods,
                          allow_headers=conf.cors.allow_headers)
 
-        # Begin constructing our configuration hash.
-        self.allowed_origins = {}
-
         # If the default configuration contains an allowed_origin, don't
         # forget to register that.
         if conf.cors.allowed_origin:
-            self.allowed_origins[conf.cors.allowed_origin] = conf.cors
+            self.add_origin(**conf.cors)
 
         # Iterate through all the loaded config sections, looking for ones
         # prefixed with 'cors.'
@@ -106,29 +144,62 @@ class CORS(base.Middleware):
             if section.startswith('cors.'):
                 # Register with the preconstructed defaults
                 conf.register_opts(subgroup_opts, section)
+                self.add_origin(**conf[section])
 
-                # Make sure that allowed_origin is available. Otherwise skip.
-                allowed_origin = conf[section].allowed_origin
-                if not allowed_origin:
-                    LOG.warn('Config section [%s] does not contain'
-                             ' \'allowed_origin\', skipping.' % (section,))
-                    continue
+    def add_origin(self, allowed_origin, allow_credentials=True,
+                   expose_headers=None, max_age=None, allow_methods=None,
+                   allow_headers=None):
+        '''Add another origin to this filter.
 
-                self.allowed_origins[allowed_origin] = conf[section]
+        :param allowed_origin: Protocol, host, and port for the allowed origin.
+        :param allow_credentials: Whether to permit credentials.
+        :param expose_headers: A list of headers to expose.
+        :param max_age: Maximum cache duration.
+        :param allow_methods: List of HTTP methods to permit.
+        :param allow_headers: List of HTTP headers to permit from the client.
+        :return:
+        '''
 
-    @webob.dec.wsgify
-    def __call__(self, req):
-        # If it's an OPTIONS request, handle it immediately. Otherwise,
-        # pass it through to the application.
-        if req.method == 'OPTIONS':
-            resp = webob.response.Response(status=webob.exc.HTTPOk.code)
-            self._apply_cors_preflight_headers(request=req, response=resp)
-        else:
-            resp = req.get_response(self.application)
-            self._apply_cors_request_headers(request=req, response=resp)
+        if allowed_origin in self.allowed_origins:
+            LOG.warn('Allowed origin [%s] already exists, skipping' % (
+                allowed_origin,))
+            return
+
+        self.allowed_origins[allowed_origin] = {
+            'allow_credentials': allow_credentials,
+            'expose_headers': expose_headers,
+            'max_age': max_age,
+            'allow_methods': allow_methods,
+            'allow_headers': allow_headers
+        }
+
+    def process_response(self, response, request=None):
+        '''Check for CORS headers, and decorate if necessary.
+
+        Perform two checks. First, if an OPTIONS request was issued, let the
+        application handle it, and (if necessary) decorate the response with
+        preflight headers. In this case, if a 404 is thrown by the underlying
+        application (i.e. if the underlying application does not handle
+        OPTIONS requests, the response code is overridden.
+
+        In the case of all other requests, regular request headers are applied.
+        '''
+
+        # Sanity precheck: If we detect CORS headers provided by something in
+        # in the middleware chain, assume that it knows better.
+        if 'Access-Control-Allow-Origin' in response.headers:
+            return response
+
+        # Doublecheck for an OPTIONS request.
+        if request.method == 'OPTIONS':
+            return self._apply_cors_preflight_headers(request=request,
+                                                      response=response)
+
+        # Apply regular CORS headers.
+        self._apply_cors_request_headers(request=request, response=response)
 
         # Finally, return the response.
-        return resp
+        return response
 
     def _split_header_values(self, request, header_name):
         """Convert a comma-separated header value into a list of values."""
@@ -147,9 +218,15 @@ class CORS(base.Middleware):
         appropriate for the request.
         """
 
+        # If the response contains a 2XX code, we have to assume that the
+        # underlying middleware's response content needs to be persisted.
+        # Otherwise, create a new response.
+        if 200 > response.status_code or response.status_code >= 300:
+            response = webob.response.Response(status=webob.exc.HTTPOk.code)
+
         # Does the request have an origin header? (Section 6.2.1)
         if 'Origin' not in request.headers:
-            return
+            return response
 
         # Is this origin registered? (Section 6.2.2)
         origin = request.headers['Origin']
@@ -159,12 +236,12 @@ class CORS(base.Middleware):
             else:
                 LOG.debug('CORS request from origin \'%s\' not permitted.'
                           % (origin,))
-                return
+                return response
         cors_config = self.allowed_origins[origin]
 
         # If there's no request method, exit. (Section 6.2.3)
         if 'Access-Control-Request-Method' not in request.headers:
-            return
+            return response
         request_method = request.headers['Access-Control-Request-Method']
 
         # Extract Request headers. If parsing fails, exit. (Section 6.2.4)
@@ -174,33 +251,34 @@ class CORS(base.Middleware):
                                           'Access-Control-Request-Headers')
         except Exception:
             LOG.debug('Cannot parse request headers.')
-            return
+            return response
 
         # Compare request method to permitted methods (Section 6.2.5)
-        if request_method not in cors_config.allow_methods:
-            return
+        if request_method not in cors_config['allow_methods']:
+            return response
 
         # Compare request headers to permitted headers, case-insensitively.
         # (Section 6.2.6)
         for requested_header in request_headers:
             upper_header = requested_header.upper()
-            permitted_headers = cors_config.allow_headers + self.simple_headers
+            permitted_headers = (cors_config['allow_headers'] +
+                                 self.simple_headers)
             if upper_header not in (header.upper() for header in
                                     permitted_headers):
-                return
+                return response
 
         # Set the default origin permission headers. (Sections 6.2.7, 6.4)
         response.headers['Vary'] = 'Origin'
         response.headers['Access-Control-Allow-Origin'] = origin
 
         # Does this CORS configuration permit credentials? (Section 6.2.7)
-        if cors_config.allow_credentials:
+        if cors_config['allow_credentials']:
             response.headers['Access-Control-Allow-Credentials'] = 'true'
 
         # Attach Access-Control-Max-Age if appropriate. (Section 6.2.8)
-        if 'max_age' in cors_config and cors_config.max_age:
+        if 'max_age' in cors_config and cors_config['max_age']:
             response.headers['Access-Control-Max-Age'] = \
-                str(cors_config.max_age)
+                str(cors_config['max_age'])
 
         # Attach Access-Control-Allow-Methods. (Section 6.2.9)
         response.headers['Access-Control-Allow-Methods'] = request_method
@@ -209,6 +287,8 @@ class CORS(base.Middleware):
         if request_headers:
             response.headers['Access-Control-Allow-Headers'] = \
                 ','.join(request_headers)
+
+        return response
 
     def _apply_cors_request_headers(self, request, response):
         """Handle Basic CORS Request (Section 6.1)
@@ -234,10 +314,10 @@ class CORS(base.Middleware):
         response.headers['Access-Control-Allow-Origin'] = origin
 
         # Does this CORS configuration permit credentials? (Section 6.1.3)
-        if cors_config.allow_credentials:
+        if cors_config['allow_credentials']:
             response.headers['Access-Control-Allow-Credentials'] = 'true'
 
         # Attach the exposed headers and exit. (Section 6.1.4)
-        if cors_config.expose_headers:
+        if cors_config['expose_headers']:
             response.headers['Access-Control-Expose-Headers'] = \
-                ','.join(cors_config.expose_headers)
+                ','.join(cors_config['expose_headers'])
