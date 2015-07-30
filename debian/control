@@ -105,7 +105,7 @@ Priority: extra
 Architecture: all
 Depends: python-oslo.middleware,
          ${misc:Depends},
-Description: transitional dummy package for python-oslo-middleware.
+Description: transitional dummy package for python-oslo-middleware
  This transitional package is safe to remove.
 
 Package: python-oslo-middleware-doc
@@ -114,7 +114,7 @@ Priority: extra
 Architecture: all
 Depends: python-oslo.middleware-doc,
          ${misc:Depends},
-Description: transitional dummy package for python-oslo-middleware-doc.
+Description: transitional dummy package for python-oslo-middleware-doc
  This transitional package is safe to remove.
 
 Package: python3-oslo-middleware
@@ -123,5 +123,5 @@ Priority: extra
 Architecture: all
 Depends: python3-oslo.middleware,
          ${misc:Depends},
-Description: transitional dummy package for python3-oslo-middleware.
+Description: transitional dummy package for python3-oslo-middleware
  This transitional package is safe to remove.
