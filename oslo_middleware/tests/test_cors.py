@@ -115,6 +115,8 @@ class CORSTestFilterFactory(test_base.BaseTestCase):
     """Test the CORS filter_factory method."""
 
     def test_filter_factory(self):
+        self.useFixture(fixture.Config()).conf([])
+
         # Test a valid filter.
         filter = cors.filter_factory(None,
                                      allowed_origin='http://valid.example.com',
@@ -128,11 +130,11 @@ class CORSTestFilterFactory(test_base.BaseTestCase):
         self.assertIn('http://valid.example.com', application.allowed_origins)
 
         config = application.allowed_origins['http://valid.example.com']
-        self.assertEqual('False', config['allow_credentials'])
-        self.assertEqual('', config['max_age'])
-        self.assertEqual('', config['expose_headers'])
-        self.assertEqual('GET', config['allow_methods'])
-        self.assertEqual('', config['allow_headers'])
+        self.assertEqual(False, config['allow_credentials'])
+        self.assertEqual(None, config['max_age'])
+        self.assertEqual([], config['expose_headers'])
+        self.assertEqual(['GET'], config['allow_methods'])
+        self.assertEqual([], config['allow_headers'])
 
     def test_no_origin_fail(self):
         '''Assert that a filter factory with no allowed_origin fails.'''
@@ -583,6 +585,41 @@ class CORSPreflightRequestTest(CORSTestBase):
                                 allow_credentials=None,
                                 expose_headers=None)
 
+    def test_simple_header_response(self):
+        """CORS Specification Section 3
+
+        A header is said to be a simple header if the header field name is an
+        ASCII case-insensitive match for Accept, Accept-Language, or
+        Content-Language or if it is an ASCII case-insensitive match for
+        Content-Type and the header field value media type (excluding
+        parameters) is an ASCII case-insensitive match for
+        application/x-www-form-urlencoded, multipart/form-data, or text/plain.
+
+        NOTE: We are not testing the media type cases.
+        """
+
+        simple_headers = ','.join([
+            'accept',
+            'accept-language',
+            'content-language',
+            'content-type'
+        ])
+
+        request = webob.Request.blank('/')
+        request.method = "OPTIONS"
+        request.headers['Origin'] = 'http://valid.example.com'
+        request.headers['Access-Control-Request-Method'] = 'GET'
+        request.headers['Access-Control-Request-Headers'] = simple_headers
+        response = request.get_response(self.application)
+        self.assertCORSResponse(response,
+                                status='200 OK',
+                                allow_origin='http://valid.example.com',
+                                max_age=None,
+                                allow_methods='GET',
+                                allow_headers=simple_headers,
+                                allow_credentials=None,
+                                expose_headers=None)
+
     def test_no_request_method(self):
         """CORS Specification Section 6.2.3
 
@@ -996,3 +1033,113 @@ class CORSTestWildcard(CORSTestBase):
                                 allow_headers='',
                                 allow_credentials='true',
                                 expose_headers=None)
+
+
+class CORSTestLatentProperties(CORSTestBase):
+    """Test the CORS wildcard specification."""
+
+    def setUp(self):
+        super(CORSTestLatentProperties, self).setUp()
+
+        # Set up the config fixture.
+        config = self.useFixture(fixture.Config(cfg.CONF))
+
+        config.load_raw_values(group='cors',
+                               allowed_origin='http://default.example.com',
+                               allow_credentials='True',
+                               max_age='',
+                               expose_headers='X-Configured',
+                               allow_methods='GET',
+                               allow_headers='X-Configured')
+
+        # Now that the config is set up, create our application.
+        self.application = cors.CORS(test_application, cfg.CONF)
+
+    def test_latent_methods(self):
+        """Assert that latent HTTP methods are permitted."""
+
+        self.application.set_latent(allow_headers=None,
+                                    expose_headers=None,
+                                    allow_methods=['POST'])
+
+        request = webob.Request.blank('/')
+        request.method = "OPTIONS"
+        request.headers['Origin'] = 'http://default.example.com'
+        request.headers['Access-Control-Request-Method'] = 'POST'
+        response = request.get_response(self.application)
+        self.assertCORSResponse(response,
+                                status='200 OK',
+                                allow_origin='http://default.example.com',
+                                max_age=None,
+                                allow_methods='POST',
+                                allow_headers='',
+                                allow_credentials='true',
+                                expose_headers=None)
+
+    def test_invalid_latent_methods(self):
+        """Assert that passing a non-list is caught."""
+
+        self.assertRaises(TypeError,
+                          self.application.set_latent,
+                          allow_methods='POST')
+
+    def test_latent_allow_headers(self):
+        """Assert that latent HTTP headers are permitted."""
+
+        self.application.set_latent(allow_headers=['X-Latent'],
+                                    expose_headers=None,
+                                    allow_methods=None)
+
+        request = webob.Request.blank('/')
+        request.method = "OPTIONS"
+        request.headers['Origin'] = 'http://default.example.com'
+        request.headers['Access-Control-Request-Method'] = 'GET'
+        request.headers[
+            'Access-Control-Request-Headers'] = 'X-Latent,X-Configured'
+        response = request.get_response(self.application)
+        self.assertCORSResponse(response,
+                                status='200 OK',
+                                allow_origin='http://default.example.com',
+                                max_age=None,
+                                allow_methods='GET',
+                                allow_headers='X-Latent,X-Configured',
+                                allow_credentials='true',
+                                expose_headers=None)
+
+    def test_invalid_latent_allow_headers(self):
+        """Assert that passing a non-list is caught in allow headers."""
+
+        self.assertRaises(TypeError,
+                          self.application.set_latent,
+                          allow_headers='X-Latent')
+
+    def test_latent_expose_headers(self):
+        """Assert that latent HTTP headers are exposed."""
+
+        self.application.set_latent(allow_headers=None,
+                                    expose_headers=[
+                                        'X-Server-Generated-Response'],
+                                    allow_methods=None)
+
+        request = webob.Request.blank('/')
+        request.method = "GET"
+        request.headers['Origin'] = 'http://default.example.com'
+        response = request.get_response(self.application)
+        self.assertCORSResponse(response,
+                                status='200 OK',
+                                allow_origin='http://default.example.com',
+                                max_age=None,
+                                allow_methods=None,
+                                allow_headers=None,
+                                allow_credentials='true',
+                                expose_headers='X-Configured,'
+                                               'X-Server-Generated-Response')
+
+    def test_invalid_latent_expose_headers(self):
+        """Assert that passing a non-list is caught in expose headers."""
+
+        # Add headers to the application.
+
+        self.assertRaises(TypeError,
+                          self.application.set_latent,
+                          expose_headers='X-Latent')

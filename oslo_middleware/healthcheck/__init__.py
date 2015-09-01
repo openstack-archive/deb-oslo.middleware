@@ -21,7 +21,7 @@ import webob.response
 from oslo_middleware import base
 
 
-class Healthcheck(base.Middleware):
+class Healthcheck(base.ConfigurableMiddleware):
     """Healthcheck middleware used for monitoring.
 
     If the path is /healthcheck, it will respond 200 with "OK" as the body.
@@ -71,16 +71,6 @@ class Healthcheck(base.Middleware):
     """
 
     NAMESPACE = "oslo.middleware.healthcheck"
-
-    @classmethod
-    def factory(cls, global_conf, **local_conf):
-        """Factory method for paste.deploy."""
-        conf = global_conf.copy()
-        conf.update(local_conf)
-
-        def healthcheck_filter(app):
-            return cls(app, conf)
-        return healthcheck_filter
 
     def __init__(self, application, conf):
         super(Healthcheck, self).__init__(application)

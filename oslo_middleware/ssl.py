@@ -21,10 +21,9 @@ OPTS = [
                     "the original request protocol scheme was, even if it was "
                     "hidden by an SSL termination proxy.")
 ]
-cfg.CONF.register_opts(OPTS, group='oslo_middleware')
 
 
-class SSLMiddleware(base.Middleware):
+class SSLMiddleware(base.ConfigurableMiddleware):
     """SSL termination proxies middleware.
 
     This middleware overloads wsgi.url_scheme with the one provided in
@@ -32,12 +31,13 @@ class SSLMiddleware(base.Middleware):
     termination proxy.
     """
 
-    def __init__(self, application):
-        super(SSLMiddleware, self).__init__(application)
-        self.header_name = 'HTTP_{0}'.format(
-            cfg.CONF.oslo_middleware.secure_proxy_ssl_header.upper()
-            .replace('-', '_'))
+    def __init__(self, application, *args, **kwargs):
+        super(SSLMiddleware, self).__init__(application, *args, **kwargs)
+        self.oslo_conf.register_opts(OPTS, group='oslo_middleware')
 
     def process_request(self, req):
+        self.header_name = 'HTTP_{0}'.format(
+            self._conf_get('secure_proxy_ssl_header').upper()
+            .replace('-', '_'))
         req.environ['wsgi.url_scheme'] = req.environ.get(
             self.header_name, req.environ['wsgi.url_scheme'])
