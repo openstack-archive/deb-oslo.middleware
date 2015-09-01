@@ -1,3 +1,12 @@
+python-oslo.middleware (2.8.0-1) experimental; urgency=medium
+
+   * New upstream release.
+   * Fixed (build-)depends for this release.
+   * Removed adds-missing-files.patch file.
+   * Add myself to Uploaders field.
+
+ -- Ivan Udovichenko <iudovichenko@mirantis.com>  Tue, 01 Sep 2015 10:10:47 -0400
+
 python-oslo.middleware (2.4.0-1) experimental; urgency=medium
 
   [ James Page ]
