@@ -18,6 +18,7 @@ import logging
 
 from oslo_config import cfg
 from oslo_middleware import base
+import six
 import webob.dec
 import webob.exc
 import webob.response
@@ -25,10 +26,10 @@ import webob.response
 LOG = logging.getLogger(__name__)
 
 CORS_OPTS = [
-    cfg.StrOpt('allowed_origin',
-               default=None,
-               help='Indicate whether this resource may be shared with the '
-                    'domain received in the requests "origin" header.'),
+    cfg.ListOpt('allowed_origin',
+                default=None,
+                help='Indicate whether this resource may be shared with the '
+                     'domain received in the requests "origin" header.'),
     cfg.BoolOpt('allow_credentials',
                 default=True,
                 help='Indicate that the actual request can include user '
@@ -51,6 +52,15 @@ CORS_OPTS = [
                 help='Indicate which header field names may be used during '
                      'the actual request.')
 ]
+
+
+class InvalidOriginError(Exception):
+    """Exception raised when Origin is invalid."""
+
+    def __init__(self, origin):
+        self.origin = origin
+        super(InvalidOriginError, self).__init__(
+            'CORS request from origin \'%s\' not permitted.' % origin)
 
 
 class CORS(base.ConfigurableMiddleware):
@@ -79,8 +89,20 @@ class CORS(base.ConfigurableMiddleware):
         self.allowed_origins = {}
         self._init_conf()
 
+        def sanitize(csv_list):
+            try:
+                return [str.strip(x) for x in csv_list.split(',')]
+            except Exception:
+                return None
+
+        self.set_latent(
+            allow_headers=sanitize(self.conf.get('latent_allow_headers')),
+            expose_headers=sanitize(self.conf.get('latent_expose_headers')),
+            allow_methods=sanitize(self.conf.get('latent_allow_methods'))
+        )
+
     @classmethod
-    def factory(cls, global_conf, allowed_origin, **local_conf):
+    def factory(cls, global_conf, **local_conf):
         """factory method for paste.deploy
 
         allowed_origin: Protocol, host, and port for the allowed origin.
@@ -90,11 +112,11 @@ class CORS(base.ConfigurableMiddleware):
         allow_methods: List of HTTP methods to permit.
         allow_headers: List of HTTP headers to permit from the client.
         """
-
-        # Ensures allowed_origin config exists
-        return super(CORS, cls).factory(global_conf,
-                                        allowed_origin=allowed_origin,
-                                        **local_conf)
+        if ('allowed_origin' not in local_conf
+           and 'oslo_config_project' not in local_conf):
+            raise TypeError("allowed_origin or oslo_config_project "
+                            "is required")
+        return super(CORS, cls).factory(global_conf, **local_conf)
 
     def _init_conf(self):
         '''Initialize this middleware from an oslo.config instance.'''
@@ -130,13 +152,12 @@ class CORS(base.ConfigurableMiddleware):
 
         # If the default configuration contains an allowed_origin, don't
         # forget to register that.
-        if allowed_origin:
-            self.add_origin(allowed_origin=allowed_origin,
-                            allow_credentials=allow_credentials,
-                            expose_headers=expose_headers,
-                            max_age=max_age,
-                            allow_methods=allow_methods,
-                            allow_headers=allow_headers)
+        self.add_origin(allowed_origin=allowed_origin,
+                        allow_credentials=allow_credentials,
+                        expose_headers=expose_headers,
+                        max_age=max_age,
+                        allow_methods=allow_methods,
+                        allow_headers=allow_headers)
 
         # Iterate through all the loaded config sections, looking for ones
         # prefixed with 'cors.'
@@ -160,18 +181,26 @@ class CORS(base.ConfigurableMiddleware):
         :return:
         '''
 
-        if allowed_origin in self.allowed_origins:
-            LOG.warn('Allowed origin [%s] already exists, skipping' % (
-                allowed_origin,))
-            return
+        # NOTE(dims): Support older code that still passes in
+        # a string for allowed_origin instead of a list
+        if isinstance(allowed_origin, six.string_types):
+            allowed_origin = [allowed_origin]
 
-        self.allowed_origins[allowed_origin] = {
-            'allow_credentials': allow_credentials,
-            'expose_headers': expose_headers,
-            'max_age': max_age,
-            'allow_methods': allow_methods,
-            'allow_headers': allow_headers
-        }
+        if allowed_origin:
+            for origin in allowed_origin:
+
+                if origin in self.allowed_origins:
+                    LOG.warn('Allowed origin [%s] already exists, skipping' % (
+                        allowed_origin,))
+                    continue
+
+                self.allowed_origins[origin] = {
+                    'allow_credentials': allow_credentials,
+                    'expose_headers': expose_headers,
+                    'max_age': max_age,
+                    'allow_methods': allow_methods,
+                    'allow_headers': allow_headers
+                }
 
     def set_latent(self, allow_headers=None, allow_methods=None,
                    expose_headers=None):
@@ -263,15 +292,11 @@ class CORS(base.ConfigurableMiddleware):
             return response
 
         # Is this origin registered? (Section 6.2.2)
-        origin = request.headers['Origin']
-        if origin not in self.allowed_origins:
-            if '*' in self.allowed_origins:
-                origin = '*'
-            else:
-                LOG.debug('CORS request from origin \'%s\' not permitted.'
-                          % (origin,))
-                return response
-        cors_config = self.allowed_origins[origin]
+        try:
+            origin, cors_config = self._get_cors_config_by_origin(
+                request.headers['Origin'])
+        except InvalidOriginError:
+            return response
 
         # If there's no request method, exit. (Section 6.2.3)
         if 'Access-Control-Request-Method' not in request.headers:
@@ -335,6 +360,16 @@ class CORS(base.ConfigurableMiddleware):
 
         return response
 
+    def _get_cors_config_by_origin(self, origin):
+        if origin not in self.allowed_origins:
+            if '*' in self.allowed_origins:
+                origin = '*'
+            else:
+                LOG.debug('CORS request from origin \'%s\' not permitted.'
+                          % origin)
+                raise InvalidOriginError(origin)
+        return origin, self.allowed_origins[origin]
+
     def _apply_cors_request_headers(self, request, response):
         """Handle Basic CORS Request (Section 6.1)
 
@@ -347,12 +382,11 @@ class CORS(base.ConfigurableMiddleware):
             return
 
         # Is this origin registered? (Section 6.1.2)
-        origin = request.headers['Origin']
-        if origin not in self.allowed_origins:
-            LOG.debug('CORS request from origin \'%s\' not permitted.'
-                      % (origin,))
+        try:
+            origin, cors_config = self._get_cors_config_by_origin(
+                request.headers['Origin'])
+        except InvalidOriginError:
             return
-        cors_config = self.allowed_origins[origin]
 
         # Set the default origin permission headers. (Sections 6.1.3 & 6.4)
         response.headers['Vary'] = 'Origin'
