@@ -1,0 +1,22 @@
+Description: Remove privacy breach in README.rst
+Author: Thomas Goirand <zigo@debian.org>
+Forwarded: no
+Last-Update: 2015-12-03
+
+--- python-oslo.middleware-3.0.0.orig/README.rst
++++ python-oslo.middleware-3.0.0/README.rst
+@@ -2,14 +2,6 @@
+ oslo.middleware
+ ===================================
+ 
+-.. image:: https://img.shields.io/pypi/v/oslo.middleware.svg
+-    :target: https://pypi.python.org/pypi/oslo.middleware/
+-    :alt: Latest Version
+-
+-.. image:: https://img.shields.io/pypi/dm/oslo.middleware.svg
+-    :target: https://pypi.python.org/pypi/oslo.middleware/
+-    :alt: Downloads
+-
+ Oslo middleware library includes components that can be injected into
+ wsgi pipelines to intercept request/response flows. The base class can be
+ enhanced with functionality like add/delete/modification of http headers

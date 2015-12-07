@@ -1,8 +1,14 @@
+python-oslo.middleware (3.0.0-2) UNRELEASED; urgency=medium
+
+  * Added patch to remove ordereddict from requirements.txt
+
+ -- Thomas Goirand <zigo@debian.org>  Mon, 07 Dec 2015 14:10:00 +0100
+
 python-oslo.middleware (3.0.0-1) experimental; urgency=medium
 
   * New upstream release.
   * Fixed (build-)depends for this release.
-  * Added patch to remove ordereddict from requirements.txt
+  * Removed privacy breach in README.rst.
 
  -- Thomas Goirand <zigo@debian.org>  Tue, 01 Dec 2015 14:29:29 +0100
 
