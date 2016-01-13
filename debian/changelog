@@ -2,6 +2,7 @@ python-oslo.middleware (3.4.0-1) experimental; urgency=medium
 
   * New upstream release.
   * Added patch to remove ordereddict from requirements.txt
+  * Fixed (build-)depends for this release.
 
  -- Thomas Goirand <zigo@debian.org>  Wed, 13 Jan 2016 04:49:46 +0000
 
