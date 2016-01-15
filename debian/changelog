@@ -1,3 +1,9 @@
+python-oslo.middleware (3.5.0-1) experimental; urgency=medium
+
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Fri, 15 Jan 2016 06:47:52 +0000
+
 python-oslo.middleware (3.4.0-1) experimental; urgency=medium
 
   * New upstream release.
