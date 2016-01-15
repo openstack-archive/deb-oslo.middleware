@@ -2,10 +2,6 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: oslo.middleware
 Source: git://github.com/openstack/oslo.middleware.git
 
-Files: debian/*
-Copyright: (c) 2014, Thomas Goirand <zigo@debian.org>
-License: Apache-2
-
 Files: *
 Copyright: (c) 2014, Intel
            (c) 2014, B1 Systems
@@ -15,9 +11,13 @@ Copyright: (c) 2014, Intel
            (c) 2014, Dreamhost
            (c) 2014, NEC
            (c) 2014, RedHat
-           (c) 2014, OpenStack Foundation
+           (c) 2014-2016, OpenStack Foundation
            (c) 2014, Canonical
            (c) 2014, IBM
+License: Apache-2
+
+Files: debian/*
+Copyright: (c) 2014-2016, Thomas Goirand <zigo@debian.org>
 License: Apache-2
 
 License: Apache-2
