@@ -2,6 +2,7 @@ python-oslo.middleware (3.6.0-1) UNRELEASED; urgency=medium
 
   * New upstream release.
   * d/control: Align depends with upstream.
+  * d/p/patch-ordereddict-out.patch: Removed. Fixed in upstream.
 
  -- David Della Vecchia <ddv@canonical.com>  Wed, 24 Feb 2016 13:47:12 -0500
 
