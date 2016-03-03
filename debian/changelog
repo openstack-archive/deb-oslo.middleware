@@ -1,4 +1,4 @@
-python-oslo.middleware (3.6.0-1) UNRELEASED; urgency=medium
+python-oslo.middleware (3.7.0-1) experimental; urgency=medium
 
   [ David Della Vecchia ]
   * New upstream release.
@@ -8,7 +8,10 @@ python-oslo.middleware (3.6.0-1) UNRELEASED; urgency=medium
   [ Ondřej Nový ]
   * Fixed VCS URLs (https).
 
- -- David Della Vecchia <ddv@canonical.com>  Wed, 24 Feb 2016 13:47:12 -0500
+  [ Thomas Goirand ]
+  * New upstream release.
+
+ -- Thomas Goirand <zigo@debian.org>  Thu, 03 Mar 2016 01:39:53 +0000
 
 python-oslo.middleware (3.5.0-1) experimental; urgency=medium
 
