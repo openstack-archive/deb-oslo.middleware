@@ -52,8 +52,8 @@ something like this::
     allowed_origin=https://website.example.com:443,https://website2.example.com:443
     max_age=3600
     allow_methods=GET,POST,PUT,DELETE
-    allow_headers=Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Custom-Header
-    expose_headers=Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Custom-Header
+    allow_headers=X-Custom-Header
+    expose_headers=X-Custom-Header
 
 This middleware permits you to override the rules for multiple
 `allowed_origin`'s. To express this in your configuration file, first begin
@@ -102,8 +102,8 @@ will add CORS support.::
     allowed_origin=https://website.example.com:443,https://website2.example.com:443
     max_age=3600
     allow_methods=GET,POST,PUT,DELETE
-    allow_headers=Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Custom-Header
-    expose_headers=Content-Type,Cache-Control,Content-Language,Expires,Last-Modified,Pragma,X-Custom-Header
+    allow_headers=X-Custom-Header
+    expose_headers=X-Custom-Header
 
 If your application is using pastedeploy, but would also like to use the
 existing configuration from oslo_config in order to simplify the points of
@@ -125,14 +125,7 @@ configuration, this may be done as follows.::
 Configuration Options
 ---------------------
 
-.. NOTE(dhellmann): An issue with the oslo.config sphinx integration
-                    makes the show-options directive here result in
-                    duplicate target nodes being introduced. Until we
-                    can fix that, use the other directive to dump a
-                    config file and include it as literal text.
-.. .. show-options:: oslo.middleware.cors
-
-.. literalinclude:: sample.config
+.. show-options:: oslo.middleware.cors
 
 Module Documentation
 --------------------

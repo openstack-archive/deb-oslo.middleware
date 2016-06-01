@@ -19,7 +19,6 @@ import logging
 from oslo_config import cfg
 from oslo_middleware import base
 import six
-import webob.dec
 import webob.exc
 import webob.response
 
@@ -29,29 +28,65 @@ CORS_OPTS = [
     cfg.ListOpt('allowed_origin',
                 default=None,
                 help='Indicate whether this resource may be shared with the '
-                     'domain received in the requests "origin" header.'),
+                     'domain received in the requests "origin" header. '
+                     'Format: "<protocol>://<host>[:<port>]", no trailing '
+                     'slash. Example: https://horizon.example.com'),
     cfg.BoolOpt('allow_credentials',
                 default=True,
                 help='Indicate that the actual request can include user '
                      'credentials'),
     cfg.ListOpt('expose_headers',
-                default=['Content-Type', 'Cache-Control', 'Content-Language',
-                         'Expires', 'Last-Modified', 'Pragma'],
+                default=[],
                 help='Indicate which headers are safe to expose to the API. '
                      'Defaults to HTTP Simple Headers.'),
     cfg.IntOpt('max_age',
                default=3600,
                help='Maximum cache age of CORS preflight requests.'),
     cfg.ListOpt('allow_methods',
-                default=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+                default=['OPTIONS', 'GET', 'HEAD', 'POST', 'PUT', 'DELETE',
+                         'TRACE', 'PATCH'],  # RFC 2616, RFC 5789
                 help='Indicate which methods can be used during the actual '
                      'request.'),
     cfg.ListOpt('allow_headers',
-                default=['Content-Type', 'Cache-Control', 'Content-Language',
-                         'Expires', 'Last-Modified', 'Pragma'],
+                default=[],
                 help='Indicate which header field names may be used during '
                      'the actual request.')
 ]
+
+
+def set_defaults(**kwargs):
+    """Override the default values for configuration options.
+
+    This method permits a project to override the default CORS option values.
+    For example, it may wish to offer a set of sane default headers which
+    allow it to function with only minimal additional configuration.
+
+    :param allow_credentials: Whether to permit credentials.
+    :type allow_credentials: bool
+    :param expose_headers: A list of headers to expose.
+    :type expose_headers: List of Strings
+    :param max_age: Maximum cache duration in seconds.
+    :type max_age: Int
+    :param allow_methods: List of HTTP methods to permit.
+    :type allow_methods: List of Strings
+    :param allow_headers: List of HTTP headers to permit from the client.
+    :type allow_headers: List of Strings
+    """
+    # Since 'None' is a valid config override, we have to use kwargs. Else
+    # there's no good way for a user to override only one option, because all
+    # the others would be overridden to 'None'.
+
+    valid_params = set(k.name for k in CORS_OPTS
+                       if k.name != 'allowed_origin')
+    passed_params = set(k for k in kwargs)
+
+    wrong_params = passed_params - valid_params
+    if wrong_params:
+        raise AttributeError('Parameter(s) [%s] invalid, please only use [%s]'
+                             % (wrong_params, valid_params))
+
+    # Set global defaults.
+    cfg.set_defaults(CORS_OPTS, **kwargs)
 
 
 class InvalidOriginError(Exception):
@@ -61,6 +96,11 @@ class InvalidOriginError(Exception):
         self.origin = origin
         super(InvalidOriginError, self).__init__(
             'CORS request from origin \'%s\' not permitted.' % origin)
+
+
+class _NoContentTypeResponse(webob.response.Response):
+
+    default_content_type = None  # prevents webob assigning content type
 
 
 class CORS(base.ConfigurableMiddleware):
@@ -285,7 +325,7 @@ class CORS(base.ConfigurableMiddleware):
         # underlying middleware's response content needs to be persisted.
         # Otherwise, create a new response.
         if 200 > response.status_code or response.status_code >= 300:
-            response = webob.response.Response(status=webob.exc.HTTPOk.code)
+            response = _NoContentTypeResponse(status=webob.exc.HTTPOk.code)
 
         # Does the request have an origin header? (Section 6.2.1)
         if 'Origin' not in request.headers:
@@ -389,7 +429,10 @@ class CORS(base.ConfigurableMiddleware):
             return
 
         # Set the default origin permission headers. (Sections 6.1.3 & 6.4)
-        response.headers['Vary'] = 'Origin'
+        if 'Vary' in response.headers:
+            response.headers['Vary'] += ',Origin'
+        else:
+            response.headers['Vary'] = 'Origin'
         response.headers['Access-Control-Allow-Origin'] = origin
 
         # Does this CORS configuration permit credentials? (Section 6.1.3)
