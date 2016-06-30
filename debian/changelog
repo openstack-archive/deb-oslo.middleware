@@ -1,6 +1,6 @@
-python-oslo.middleware (3.14.0-0ubuntu1) yakkety; urgency=medium
+python-oslo.middleware (3.14.0-1) UNRELEASED; urgency=medium
 
-  * New upstream release for OpenStack Newton.
+  * New upstream release.
   * d/control: Align (build-)depends with upstream.
 
  -- David Della Vecchia <ddv@canonical.com>  Thu, 30 Jun 2016 11:04:28 -0400
