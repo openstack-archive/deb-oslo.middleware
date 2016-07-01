@@ -109,30 +109,3 @@ Description: various WSGI middleware components for OpenStack - doc
  the OpenStack projects that are using the WSGI pipeline.
  .
  This package contains the documentation.
-
-Package: python-oslo-middleware
-Section: oldlibs
-Priority: extra
-Architecture: all
-Depends: python-oslo.middleware,
-         ${misc:Depends},
-Description: transitional dummy package for python-oslo-middleware
- This transitional package to python-oslo.middleware is safe to remove.
-
-Package: python-oslo-middleware-doc
-Section: oldlibs
-Priority: extra
-Architecture: all
-Depends: python-oslo.middleware-doc,
-         ${misc:Depends},
-Description: transitional dummy package for python-oslo-middleware-doc
- This transitional package to python-oslo.middleware-doc is safe to remove.
-
-Package: python3-oslo-middleware
-Section: oldlibs
-Priority: extra
-Architecture: all
-Depends: python3-oslo.middleware,
-         ${misc:Depends},
-Description: transitional dummy package for python3-oslo-middleware
- This transitional package to python3-oslo.middleware is safe to remove.
