@@ -6,6 +6,7 @@ python-oslo.middleware (3.14.0-1) experimental; urgency=medium
 
   [ Thomas Goirand ]
   * Drop the python-oslo-* transition packages as Xenial is released.
+  * Switch to pkgos-dh_auto_{test,install}.
 
  -- Thomas Goirand <zigo@debian.org>  Fri, 01 Jul 2016 18:59:30 +0000
 
